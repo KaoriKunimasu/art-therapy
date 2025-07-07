@@ -1,0 +1,41 @@
+{
+	"folders": [
+		{
+			"path": "../../../SourceInfinity/Applight2"
+		},
+		{
+			"path": "../../../SourceInfinity/ApplightReact"
+		},
+		{
+			"path": "../../../SourceInfinity/myui"
+		},
+		{
+			"path": "../../../SourceInfinity/Applight"
+		},
+		{
+			"path": "../../../SourceInfinity/admin/AdminLTE-4.0.0-beta3"
+		},
+		{
+			"path": "../../../SourceInfinity/admin/v0"
+		},
+		{
+			"path": "../../../SourceInfinity/admin/v0/testApp/my-app"
+		},
+		{
+			"path": "../../../SourceInfinity/admin/google-analytics-dashboard"
+		},
+		{
+			"path": "../../../SourceInfinity/dashboard"
+		},
+		{
+			"path": "../../../SourceInfinity/UIDashboard/UIAdminClean"
+		},
+		{
+			"path": "../art-therapy-platform"
+		},
+		{
+			"path": "."
+		}
+	],
+	"settings": {}
+}
