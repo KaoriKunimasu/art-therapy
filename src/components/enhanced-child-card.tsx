@@ -1,12 +1,13 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Play, Eye, Clock } from "lucide-react"
 import type { Child } from "@/app/page"
-import { ArtworkStorage } from "@/lib/artwork-storage"
+import { ArtworkStorage, type Artwork } from "@/lib/artwork-storage"
 
 interface EnhancedChildCardProps {
   child: Child
@@ -29,10 +30,29 @@ function formatTimeAgo(dateString: string): string {
 }
 
 export function EnhancedChildCard({ child, onStartSession, onViewArtwork }: EnhancedChildCardProps) {
-  // Get the most recent drawing for this child
-  const artworks = ArtworkStorage.getArtworksByChild(child.id)
-  const lastArtwork = artworks.length > 0 ? artworks.reduce((a, b) => new Date(a.createdAt) > new Date(b.createdAt) ? a : b) : null
-  const lastDrawingText = lastArtwork ? formatTimeAgo(lastArtwork.createdAt) : 'No drawings yet'
+  const [artworks, setArtworks] = useState<Artwork[]>([])
+  const [lastDrawingText, setLastDrawingText] = useState('No drawings yet')
+
+  useEffect(() => {
+    const loadArtworks = async () => {
+      try {
+        const childArtworks = await ArtworkStorage.getArtworksByChild(child.id)
+        setArtworks(childArtworks)
+        
+        if (childArtworks.length > 0) {
+          const lastArtwork = childArtworks.reduce((a, b) => 
+            new Date(a.createdAt) > new Date(b.createdAt) ? a : b
+          )
+          setLastDrawingText(formatTimeAgo(lastArtwork.createdAt))
+        }
+      } catch (error) {
+        console.error('Error loading artworks:', error)
+      }
+    }
+    
+    loadArtworks()
+  }, [child.id])
+
   return (
     <Card className="hover:shadow-lg transition-shadow border border-gray-200">
       <CardHeader className="text-center pb-4">

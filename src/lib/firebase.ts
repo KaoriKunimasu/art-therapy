@@ -11,21 +11,24 @@ import {
   onAuthStateChanged,
   User as FirebaseUser
 } from 'firebase/auth'
+import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'
+import { getFirestore, doc, setDoc, getDoc, deleteDoc, collection, query, where, getDocs } from 'firebase/firestore'
 
 // Firebase configuration
-// You'll need to replace these with your actual Firebase config values
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "demo-api-key",
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "demo-project.firebaseapp.com",
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "demo-project",
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "demo-project.appspot.com",
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "123456789",
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "demo-app-id"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
 }
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig)
 const auth = getAuth(app)
+const storage = getStorage(app)
+const db = getFirestore(app)
 
 // Auth providers
 const googleProvider = new GoogleAuthProvider()
@@ -206,4 +209,117 @@ export const getCurrentUser = (): FirebaseUser | null => {
   return auth.currentUser
 }
 
-export { auth } 
+// Firebase Storage helpers
+export const uploadArtworkImage = async (imageDataUrl: string, artworkId: string): Promise<string> => {
+  try {
+    // Convert data URL to blob
+    const response = await fetch(imageDataUrl)
+    const blob = await response.blob()
+    
+    // Upload to Firebase Storage
+    const storageRef = ref(storage, `artworks/${artworkId}/image.png`)
+    await uploadBytes(storageRef, blob)
+    
+    // Get download URL
+    const downloadURL = await getDownloadURL(storageRef)
+    return downloadURL
+  } catch (error) {
+    console.error('Error uploading artwork image:', error)
+    throw error
+  }
+}
+
+export const uploadArtworkThumbnail = async (thumbnailDataUrl: string, artworkId: string): Promise<string> => {
+  try {
+    // Convert data URL to blob
+    const response = await fetch(thumbnailDataUrl)
+    const blob = await response.blob()
+    
+    // Upload to Firebase Storage
+    const storageRef = ref(storage, `artworks/${artworkId}/thumbnail.jpg`)
+    await uploadBytes(storageRef, blob)
+    
+    // Get download URL
+    const downloadURL = await getDownloadURL(storageRef)
+    return downloadURL
+  } catch (error) {
+    console.error('Error uploading artwork thumbnail:', error)
+    throw error
+  }
+}
+
+export const deleteArtworkFromStorage = async (artworkId: string): Promise<void> => {
+  try {
+    // Delete image
+    const imageRef = ref(storage, `artworks/${artworkId}/image.png`)
+    await deleteObject(imageRef)
+    
+    // Delete thumbnail
+    const thumbnailRef = ref(storage, `artworks/${artworkId}/thumbnail.jpg`)
+    await deleteObject(thumbnailRef)
+  } catch (error) {
+    console.error('Error deleting artwork from storage:', error)
+    throw error
+  }
+}
+
+// Firestore helpers for artwork metadata
+export const saveArtworkMetadata = async (artwork: any): Promise<void> => {
+  try {
+    const docRef = doc(db, 'artworks', artwork.id)
+    await setDoc(docRef, {
+      ...artwork,
+      userId: auth.currentUser?.uid,
+      createdAt: new Date().toISOString(),
+    })
+  } catch (error) {
+    console.error('Error saving artwork metadata:', error)
+    throw error
+  }
+}
+
+export const getArtworkMetadata = async (artworkId: string): Promise<any | null> => {
+  try {
+    const docRef = doc(db, 'artworks', artworkId)
+    const docSnap = await getDoc(docRef)
+    
+    if (docSnap.exists()) {
+      return docSnap.data()
+    }
+    return null
+  } catch (error) {
+    console.error('Error getting artwork metadata:', error)
+    throw error
+  }
+}
+
+export const getArtworksByChild = async (childId: string): Promise<any[]> => {
+  try {
+    const q = query(
+      collection(db, 'artworks'),
+      where('childId', '==', childId),
+      where('userId', '==', auth.currentUser?.uid)
+    )
+    const querySnapshot = await getDocs(q)
+    
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }))
+  } catch (error) {
+    console.error('Error getting artworks by child:', error)
+    throw error
+  }
+}
+
+export const deleteArtworkMetadata = async (artworkId: string): Promise<void> => {
+  try {
+    const docRef = doc(db, 'artworks', artworkId)
+    await deleteDoc(docRef)
+  } catch (error) {
+    console.error('Error deleting artwork metadata:', error)
+    throw error
+  }
+}
+
+export { auth, storage, db }

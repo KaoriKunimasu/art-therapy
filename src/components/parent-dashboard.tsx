@@ -77,15 +77,6 @@ export function ParentDashboard({ user, children, onStartSession, onLogout, onAd
               <span>Dashboard</span>
             </Button>
             <Button
-              variant={activeTab === "children" ? "default" : "ghost"}
-              size="sm"
-              className="flex items-center space-x-2"
-              onClick={() => setActiveTab("children")}
-            >
-              <Users className="w-4 h-4" />
-              <span>Children</span>
-            </Button>
-            <Button
               variant="ghost"
               size="sm"
               className="flex items-center space-x-2"

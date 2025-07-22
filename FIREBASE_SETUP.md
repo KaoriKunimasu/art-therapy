@@ -1,83 +1,186 @@
-# Firebase Authentication Setup
+# Firebase Setup Guide
 
-This project now uses Firebase Authentication for secure user login. Follow these steps to set up Firebase:
+## Authentication Setup
 
-## 1. Create a Firebase Project
+This guide will help you set up Firebase Authentication and Firestore for the Therapy Canvas application.
 
-1. Go to [Firebase Console](https://console.firebase.google.com/)
-2. Click "Create a project" or select an existing project
-3. Follow the setup wizard
+### Step 1: Firebase Console Configuration
 
-## 2. Enable Authentication
+1. **Go to Firebase Console**: https://console.firebase.google.com
+2. **Select your project**: `therapycanvas-d1b03`
+3. **Navigate to Authentication**: In the left sidebar, click "Authentication"
 
-1. In your Firebase project, go to "Authentication" in the left sidebar
-2. Click "Get started"
-3. Go to the "Sign-in method" tab
-4. Enable the following providers:
-   - **Email/Password**: Enable and configure
-   - **Google**: Enable and configure (add your domain to authorized domains)
-   - **Apple**: Enable and configure (requires Apple Developer account)
+### Step 2: Update Firestore Rules
 
-## 3. Get Your Firebase Configuration
+1. **Navigate to Firestore**: In the left sidebar, click "Firestore Database"
+2. **Click on "Rules" tab**
+3. **Replace the existing rules** with the content from `firestore.rules`:
 
-1. In Firebase Console, go to Project Settings (gear icon)
-2. Scroll down to "Your apps" section
-3. Click the web app icon (</>) to add a web app if you haven't already
-4. Copy the configuration object
+```javascript
+rules_version = '2';
 
-## 4. Set Environment Variables
-
-Create a `.env.local` file in your project root with the following variables:
-
-```env
-NEXT_PUBLIC_FIREBASE_API_KEY=your-api-key-here
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project-id.firebaseapp.com
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-project-id
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your-project-id.appspot.com
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=123456789
-NEXT_PUBLIC_FIREBASE_APP_ID=your-app-id-here
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow authenticated users to read and write their own artwork metadata
+    match /artworks/{artworkId} {
+      allow read, write: if request.auth != null 
+        && request.auth.uid != null
+        && request.auth.uid == resource.data.userId;
+    }
+    
+    // Allow authenticated users to read and write their own user data
+    match /users/{userId} {
+      allow read, write: if request.auth != null 
+        && request.auth.uid == userId;
+    }
+    
+    // Allow authenticated users to read and write their own children data
+    match /children/{childId} {
+      allow read, write: if request.auth != null 
+        && request.auth.uid != null
+        && request.auth.uid == resource.data.userId;
+    }
+    
+    // Deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
 ```
 
-Replace the values with your actual Firebase configuration.
+4. **Click "Publish"** to save the rules
 
-## 5. Configure Authorized Domains
+### Step 3: Enable Authentication Methods
 
-1. In Firebase Console, go to Authentication > Settings
-2. Add your domain to "Authorized domains" for production
-3. For development, `localhost` should already be included
+1. **Navigate to Authentication**: In the left sidebar, click "Authentication"
+2. **Click on "Sign-in method" tab**
+3. **Enable the following providers**:
+   - **Email/Password**: Click "Enable" and save
+   - **Google**: Click "Enable", configure OAuth consent screen, and save
 
-## 6. Test the Authentication
+### Step 4: Add Authorized Domains
 
-1. Start your development server: `npm run dev`
-2. Try signing in with email/password
-3. Test Google and Apple sign-in (if configured)
+1. **In Authentication**, click on "Settings" tab
+2. **Scroll down to "Authorized domains"**
+3. **Add the following domains**:
+   - `localhost`
+   - `localhost:3000`
+   - Your production domain (when ready)
 
-## Features Implemented
+### Step 5: Environment Variables
 
-- ✅ Email/Password authentication
-- ✅ Google Sign-In
-- ✅ Apple Sign-In
-- ✅ Automatic session persistence
-- ✅ Secure logout
-- ✅ Error handling for all auth methods
-- ✅ User-friendly error messages
+Make sure your `.env.local` file has the correct Firebase configuration:
 
-## Demo Mode
+```env
+NEXT_PUBLIC_FIREBASE_API_KEY=your_actual_api_key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=therapycanvas-d1b03.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=therapycanvas-d1b03
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
+```
 
-If you don't have Firebase configured, the app will use demo credentials:
-- Email: `parent@example.com`
-- Password: `password`
+### Step 6: Test the Setup
 
-## Security Notes
-
-- All Firebase config variables are prefixed with `NEXT_PUBLIC_` to work with client-side authentication
-- The Firebase configuration is safe to expose in the client as it's designed for public use
-- User authentication state is managed securely by Firebase
-- Session persistence is handled automatically by Firebase Auth
+1. **Restart your development server**: `npm run dev`
+2. **Try to sign in**: The authentication should work properly
+3. **Check the console**: You should see success messages instead of errors
 
 ## Troubleshooting
 
-- **"Firebase App named '[DEFAULT]' already exists"**: This is normal if you have multiple Firebase instances
-- **"auth/popup-blocked"**: Allow popups for your domain
-- **"auth/unauthorized-domain"**: Add your domain to Firebase authorized domains
-- **Apple Sign-In not working**: Ensure you have a valid Apple Developer account and have configured Sign in with Apple 
+### If authentication fails:
+
+1. **Verify your Firebase config** in `.env.local`
+2. **Check if Authentication is enabled** in Firebase Console
+3. **Ensure authorized domains** include localhost
+
+### If Firestore access fails:
+
+1. **Check Firestore rules** are published
+2. **Verify you have sufficient quota**
+3. **Check browser console** for detailed error messages
+
+## Security Notes
+
+- The rules provided allow authenticated users to access their own data
+- For production, consider more restrictive rules based on your needs
+- Always test thoroughly before deploying to production
+
+## Data Storage
+
+This application now uses localStorage for artwork storage instead of Firebase Storage. This provides:
+- Faster access to artwork data
+- No network dependencies for artwork storage
+- Simplified setup and maintenance
+- Better offline functionality
+
+Artwork metadata can still be stored in Firestore if needed for cross-device synchronization. 
+
+---
+
+## **How to Fix Firebase Storage CORS Errors**
+
+### 1. **Set CORS Rules for Your Storage Bucket**
+
+Firebase Storage buckets do **not** allow cross-origin requests by default.  
+You must set CORS rules using the Google Cloud CLI.
+
+#### **A. Install the Google Cloud SDK (if you haven’t already)**
+- [Download and install the gcloud CLI](https://cloud.google.com/sdk/docs/install)
+
+#### **B. Authenticate with your Google account**
+```sh
+gcloud auth login
+```
+
+#### **C. Set your project**
+```sh
+gcloud config set project therapycanvas-d1b03
+```
+
+#### **D. Create a CORS configuration file (cors.json)**
+Create a file named `cors.json` with the following content:
+```json
+[
+  {
+    "origin": ["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:3000", "http://127.0.0.1:5173"],
+    "method": ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"],
+    "maxAgeSeconds": 3600,
+    "responseHeader": ["Content-Type", "Authorization", "x-goog-meta-custom"]
+  }
+]
+```
+- Add your production domain to the `origin` array when you deploy.
+
+#### **E. Apply the CORS rules to your bucket**
+```sh
+gsutil cors set cors.json gs://therapycanvas-d1b03.appspot.com
+```
+- If you get a "gsutil: command not found" error, make sure the Google Cloud SDK is installed and initialized.
+
+---
+
+### 2. **Restart Your App and Test Again**
+
+- After running the above command, CORS should be fixed for your local development and you should be able to upload and download images from Firebase Storage.
+
+---
+
+## **Why This Works**
+
+- The Firebase Console UI does **not** provide a way to set CORS for Storage.  
+- The CORS rules must be set using the `gsutil` tool from the Google Cloud SDK.
+
+---
+
+## **Summary Checklist**
+
+- [x] Firebase config includes `storageBucket`
+- [x] `.env.local` is correct
+- [x] Firebase Storage rules allow authenticated users
+- [x] **CORS rules set using `gsutil cors set`**
+
+---
+
+**If you follow these steps, your CORS errors will be resolved.**  
+If you need a step-by-step for your OS or run into issues with `gsutil`, let me know! 

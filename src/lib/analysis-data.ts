@@ -1,4 +1,6 @@
 import type { Child } from "@/app/page"
+import { db } from './firebase'
+import { doc, getDoc, setDoc } from 'firebase/firestore'
 
 export interface ArtworkInsight {
   id: string
@@ -98,4 +100,19 @@ export const getFamilyStats = (children: Child[]) => {
       childName: child.nickname,
     })),
   }
+}
+
+// Firestore helpers for analysis caching
+export async function getAnalysisForArtwork(artworkId: string) {
+  const ref = doc(db, 'artworkAnalyses', artworkId)
+  const snap = await getDoc(ref)
+  if (snap.exists()) {
+    return snap.data()
+  }
+  return null
+}
+
+export async function saveAnalysisForArtwork(artworkId: string, analysis: any) {
+  const ref = doc(db, 'artworkAnalyses', artworkId)
+  await setDoc(ref, analysis)
 }

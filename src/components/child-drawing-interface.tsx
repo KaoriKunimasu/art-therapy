@@ -595,13 +595,13 @@ export function ChildDrawingInterface({ child, onReturnToParent }: ChildDrawingI
       const dataUrl = canvas.toDataURL("image/png")
       const thumbnail = ArtworkStorage.generateThumbnail(canvas)
 
-      const existingArtworks = ArtworkStorage.getArtworksByChild(child.id)
+      const existingArtworks = await ArtworkStorage.getArtworksByChild(child.id)
       const title = `My Drawing ${existingArtworks.length + 1}`
 
       // Calculate final duration
       const finalDuration = Math.round(totalDrawingTime * 10) / 10 // Round to 1 decimal place
 
-      ArtworkStorage.saveArtwork({
+      const savedArtwork = await ArtworkStorage.saveArtwork({
         childId: child.id,
         childName: child.nickname,
         title,

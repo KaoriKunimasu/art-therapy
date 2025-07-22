@@ -12,6 +12,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { imageBase64, childName, title } = body
 
+    // Log the incoming base64 (first 100 chars for brevity)
+    console.log('Received imageBase64:', typeof imageBase64 === 'string' ? imageBase64.slice(0, 100) : imageBase64)
+
     if (!imageBase64 || !childName || !title) {
       return NextResponse.json(
         { error: 'Missing required fields: imageBase64, childName, title' }, 
@@ -19,7 +22,25 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const base64Data = imageBase64.replace(/^data:image\/[a-z]+;base64,/, '')
+    // Remove data URL prefix if present
+    const base64Data = typeof imageBase64 === 'string' ? imageBase64.replace(/^data:image\/[a-zA-Z0-9+]+;base64,/, '') : ''
+    console.log('base64Data sent to Anthropic:', base64Data.slice(0, 100))
+
+    // Defensive checks for base64 validity
+    if (!base64Data || base64Data.length < 100) {
+      return NextResponse.json(
+        { error: 'Invalid or empty base64 image data' },
+        { status: 400 }
+      )
+    }
+    // Basic base64 validation (only checks for valid characters)
+    const base64Pattern = /^[A-Za-z0-9+/=\r\n]+$/
+    if (!base64Pattern.test(base64Data)) {
+      return NextResponse.json(
+        { error: 'Malformed base64 image data' },
+        { status: 400 }
+      )
+    }
 
     const anthropicRes = await fetch(ANTHROPIC_API_URL, {
       method: 'POST',

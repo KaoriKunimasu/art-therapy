@@ -11,6 +11,8 @@ import { InsightsPinModal } from "@/components/insights-pin-modal"
 import { PinStorage } from "@/lib/pin-storage"
 import type { Child } from "@/app/page"
 import { analyzeDrawingWithClaude, type ArtTherapyAnalysis } from '@/lib/anthropic'
+import { fetchImageAsBase64 } from '@/lib/utils'
+import { getAnalysisForArtwork, saveAnalysisForArtwork } from '@/lib/analysis-data'
 
 interface DrawingAnalysis {
   id: string
@@ -71,19 +73,25 @@ export function GalleryAnalysisInterface({ child, onBack }: GalleryAnalysisInter
   // ✅ FIXED: Clean performRealAnalysis function
   const performRealAnalysis = async (artwork: Artwork) => {
     if (!artwork) return
-    
     try {
       setIsAnalyzing(true)
-      console.log('🎨 Starting real analysis for:', artwork.title)
-      console.log('📊 Child name:', child.nickname)
-      
+      // 1. Check Firestore for cached analysis
+      const cached = await getAnalysisForArtwork(artwork.id)
+      if (cached) {
+        setAnalysis(cached)
+        setIsAnalyzing(false)
+        return
+      }
+      // 2. If not cached, call API
+      let imageBase64 = artwork.dataUrl
+      if (imageBase64.startsWith('http')) {
+        imageBase64 = await fetchImageAsBase64(imageBase64)
+      }
       const result = await analyzeDrawingWithClaude({
-        imageBase64: artwork.dataUrl,
+        imageBase64,
         childName: child.nickname,
         title: artwork.title
       })
-      
-      // Convert to your DrawingAnalysis format
       const realAnalysis: DrawingAnalysis = {
         id: Date.now().toString(),
         artworkId: artwork.id,
@@ -97,13 +105,11 @@ export function GalleryAnalysisInterface({ child, onBack }: GalleryAnalysisInter
         creativeJourney: result.creativeJourney,
         suggestedActions: result.suggestedActions
       }
-      
       setAnalysis(realAnalysis)
-      console.log('✅ Analysis completed:', realAnalysis)
-      
+      // 3. Save to Firestore for future use
+      await saveAnalysisForArtwork(artwork.id, realAnalysis)
     } catch (error) {
       console.error('❌ Analysis failed:', error)
-      // Fallback to mock data if API fails
       setAnalysis(mockAnalyses["1"] || null)
     } finally {
       setIsAnalyzing(false)
@@ -111,17 +117,25 @@ export function GalleryAnalysisInterface({ child, onBack }: GalleryAnalysisInter
   }
 
   useEffect(() => {
-    let childArtworks = ArtworkStorage.getArtworksByChild(child.id)
-    // MIGRATION: Add childName if missing (for old artworks)
-    childArtworks = childArtworks.map(art => ({
-      ...art,
-      childName: art.childName || child.nickname
-    }))
-    setArtworks(childArtworks)
-    if (childArtworks.length > 0) {
-      setSelectedArtwork(childArtworks[0])
-      performRealAnalysis(childArtworks[0])
+    const loadArtworks = async () => {
+      try {
+        let childArtworks = await ArtworkStorage.getArtworksByChild(child.id)
+        // MIGRATION: Add childName if missing (for old artworks)
+        childArtworks = childArtworks.map(art => ({
+          ...art,
+          childName: art.childName || child.nickname
+        }))
+        setArtworks(childArtworks)
+        if (childArtworks.length > 0) {
+          setSelectedArtwork(childArtworks[0])
+          performRealAnalysis(childArtworks[0])
+        }
+      } catch (error) {
+        console.error('Error loading artworks:', error)
+      }
     }
+    
+    loadArtworks()
   }, [child.id])
 
   useEffect(() => {
@@ -141,20 +155,24 @@ export function GalleryAnalysisInterface({ child, onBack }: GalleryAnalysisInter
   }, [insightsUnlocked, sessionTimeRemaining])
 
   // ✅ FIXED: handleDeleteArtwork function
-  const handleDeleteArtwork = (artworkId: string) => {
+  const handleDeleteArtwork = async (artworkId: string) => {
     if (confirm("Are you sure you want to delete this artwork?")) {
-      ArtworkStorage.deleteArtwork(artworkId)
-      const updatedArtworks = artworks.filter((art) => art.id !== artworkId)
-      setArtworks(updatedArtworks)
+      try {
+        await ArtworkStorage.deleteArtwork(artworkId)
+        const updatedArtworks = artworks.filter((art) => art.id !== artworkId)
+        setArtworks(updatedArtworks)
 
-      if (selectedArtwork?.id === artworkId) {
-        if (updatedArtworks.length > 0) {
-          setSelectedArtwork(updatedArtworks[0])
-          performRealAnalysis(updatedArtworks[0]) // ✅ Fixed: use real analysis
-        } else {
-          setSelectedArtwork(null)
-          setAnalysis(null)
+        if (selectedArtwork?.id === artworkId) {
+          if (updatedArtworks.length > 0) {
+            setSelectedArtwork(updatedArtworks[0])
+            performRealAnalysis(updatedArtworks[0]) // ✅ Fixed: use real analysis
+          } else {
+            setSelectedArtwork(null)
+            setAnalysis(null)
+          }
         }
+      } catch (error) {
+        console.error('Error deleting artwork:', error)
       }
     }
   }

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Download, Trash2, Calendar, Palette } from "lucide-react"
 import { ArtworkStorage, type Artwork } from "@/lib/artwork-storage"
@@ -21,13 +21,23 @@ export function ArtworkGallery({ child, children, onBack, isParentView = false }
   const [selectedArtwork, setSelectedArtwork] = useState<Artwork | null>(null)
 
   useEffect(() => {
-    if (child) {
-      // Child view - show only their artworks
-      setArtworks(ArtworkStorage.getArtworksByChild(child.id))
-    } else if (children) {
-      // Parent view - show all artworks
-      setArtworks(ArtworkStorage.getAllArtworks())
+    const loadArtworks = async () => {
+      try {
+        if (child) {
+          // Child view - show only their artworks
+          const childArtworks = await ArtworkStorage.getArtworksByChild(child.id)
+          setArtworks(childArtworks)
+        } else if (children) {
+          // Parent view - show all artworks
+          const allArtworks = await ArtworkStorage.getAllArtworks()
+          setArtworks(allArtworks)
+        }
+      } catch (error) {
+        console.error('Error loading artworks:', error)
+      }
     }
+    
+    loadArtworks()
   }, [child, children])
 
   const handleDownload = (artwork: Artwork) => {
@@ -37,11 +47,15 @@ export function ArtworkGallery({ child, children, onBack, isParentView = false }
     link.click()
   }
 
-  const handleDelete = (artworkId: string) => {
+  const handleDelete = async (artworkId: string) => {
     if (confirm("Are you sure you want to delete this artwork?")) {
-      ArtworkStorage.deleteArtwork(artworkId)
-      setArtworks((prev) => prev.filter((art) => art.id !== artworkId))
-      setSelectedArtwork(null)
+      try {
+        await ArtworkStorage.deleteArtwork(artworkId)
+        setArtworks((prev) => prev.filter((art) => art.id !== artworkId))
+        setSelectedArtwork(null)
+      } catch (error) {
+        console.error('Error deleting artwork:', error)
+      }
     }
   }
 
@@ -93,7 +107,7 @@ export function ArtworkGallery({ child, children, onBack, isParentView = false }
         {artworks.length === 0 ? (
           <Card className="text-center py-12">
             <CardContent>
-              <Palette className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+              {/* Remove Palette icon and placeholder.svg */}
               <h3 className="text-xl font-semibold text-gray-900 mb-2">No Artworks Yet</h3>
               <p className="text-gray-600 mb-4">
                 {isParentView
@@ -112,9 +126,10 @@ export function ArtworkGallery({ child, children, onBack, isParentView = false }
                     onClick={() => setSelectedArtwork(artwork)}
                   >
                     <img
-                      src={artwork.thumbnail || "/placeholder.svg"}
+                      src={artwork.thumbnail || undefined}
                       alt={artwork.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                      style={{ background: '#f3f4f6' }}
                     />
                   </div>
                   <div className="flex items-center justify-between text-sm text-gray-600">
@@ -166,14 +181,18 @@ export function ArtworkGallery({ child, children, onBack, isParentView = false }
                 </span>
               </div>
             </DialogTitle>
+            <DialogDescription>
+              This dialog shows the details of the selected artwork. You can download or delete the artwork here.
+            </DialogDescription>
           </DialogHeader>
           {selectedArtwork && (
             <div className="space-y-4">
               <div className="bg-gray-100 rounded-lg p-4">
                 <img
-                  src={selectedArtwork.dataUrl || "/placeholder.svg"}
+                  src={selectedArtwork.dataUrl || undefined}
                   alt={selectedArtwork.title}
                   className="w-full h-auto max-h-[60vh] object-contain mx-auto"
+                  style={{ background: '#f3f4f6' }}
                 />
               </div>
               <div className="flex justify-center space-x-4">
